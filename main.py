@@ -1,145 +1,96 @@
 import requests
 import time
-import os
+import itertools
+from colorama import Fore, Style, init
 
-from urllib.parse import urlparse
+# Initialize colorama for colored output
+init(autoreset=True)
 
+# ───────────────────────────────────────────
+#  🌲 forestarmy - NODEGO Unlimited Requests Script
+#  Proudly made by itsmesatyavir
+#  No selling | No Spam
+# ───────────────────────────────────────────
 
-class NodeGoPinger:
-    def __init__(self, token, proxy_url=None):
-        self.api_base_url = "https://nodego.ai/api"
-        self.bearer_token = token
-        self.session = requests.Session()
+banner = f"""{Fore.CYAN + Style.BRIGHT}
+──────────────────────────────────────────
+ 🌲 FORESTARMY - NODEGO Unlimited Requests Script
+ Proudly made by itsmesatyavir
+ No selling | No Spam
+──────────────────────────────────────────
+{Style.RESET_ALL}"""
+print(banner)
 
-        if proxy_url:
-            self.set_proxy(proxy_url)
+# Endpoints
+ping_url = "https://nodego.ai/api/user/nodes/ping"
+client_ip_url = "https://api.bigdatacloud.net/data/client-ip"
 
-    def set_proxy(self, proxy_url):
-        parsed_url = urlparse(proxy_url)
+# Default Authorization token
+default_token = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxMzAxNjcwMjYzODA0Mzk1NTIwIiwiaWF0IjoxNzM5MzQwMTM5LCJleHAiOjE3NDA1NDk3Mzl9.S_1r665mmdG1h-ph9tdZz7pzESUiMxI5tDlLFxjjskjRXUMPbYb58mo7M8UXAK2u7ggZUu0v2ZA5H0pPlUN4Xw"
 
-        if proxy_url.startswith("socks"):
-            self.session.proxies = {"http": proxy_url, "https": proxy_url}
-        elif proxy_url.startswith("http"):
-            self.session.proxies = {"http": proxy_url, "https": proxy_url}
-        else:
-            http_url = f"http://{proxy_url}"
-            self.session.proxies = {"http": http_url, "https": http_url}
+# Load tokens from forest.txt
+def load_tokens(filename="forest.txt"):
+    try:
+        with open(filename, "r") as f:
+            tokens = [line.strip() for line in f if line.strip()]
+        return tokens if tokens else [default_token]  # Use default if file is empty
+    except FileNotFoundError:
+        return [default_token]  # Use default if file doesn't exist
 
-    def make_request(self, method, endpoint, data=None):
-        url = f"{self.api_base_url}{endpoint}"
-        headers = {
-            "Authorization": f"Bearer {self.bearerToken}",
-            "Content-Type": "application/json",
-            "Accept": "*/*",
-        }
+tokens = load_tokens()
+token_cycle = itertools.cycle(tokens)  # Rotate tokens
 
+# Headers for client IP request
+headers = {
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Accept-Language": "en-US,en;q=0.9",
+    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+}
+
+# Payload for ping request
+ping_payload = {"type": "extension"}
+
+# Infinite request loop
+request_count = 0
+
+try:
+    while True:
+        request_count += 1
+        current_token = next(token_cycle)  # Get the next token
+
+        # Headers for ping request
+        ping_headers = headers.copy()
+        ping_headers["Authorization"] = f"Bearer {current_token}"
+        ping_headers["Content-Type"] = "application/json"
+
+        # Send POST request to ping endpoint
         try:
-            response = self.session.request(
-                method, url, json=data, headers=headers, timeout=30
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}")
-            return None
-
-    def get_user_info(self):
-        response = self.make_request("GET", "/user/me")
-        if response:
-            metadata = response.get("metadata", {})
-            return {
-                "username": metadata.get("username"),
-                "email": metadata.get("email"),
-                "totalPoint": metadata.get("rewardPoint"),
-                "nodes": [
-                    {
-                        "id": node.get("id"),
-                        "totalPoint": node.get("totalPoint"),
-                        "todayPoint": node.get("todayPoint"),
-                        "isActive": node.get("isActive"),
-                    }
-                    for node in metadata.get("nodes", [])
-                ],
-            }
-        return None
-
-    def ping(self):
-        response = self.make_request("POST", "/user/nodes/ping", {"type": "extension"})
-        if response:
-            return {
-                "statusCode": response.get("statusCode"),
-                "message": response.get("message"),
-                "metadataId": response.get("metadata", {}).get("id"),
-            }
-        return None
-
-
-class MultiAccountPinger:
-    def __init__(self):
-        self.accounts = self.load_accounts()
-        self.is_running = True
-
-    def load_accounts(self):
-        try:
-            with open("forest.txt", "r", encoding="utf-8") as f:
-                account_data = [line.strip() for line in f if line.strip()]
-
-            proxy_data = []
-            if os.path.exists("proxies.txt"):
-                with open("proxies.txt", "r", encoding="utf-8") as f:
-                    proxy_data = [line.strip() for line in f if line.strip()]
-
-            return [
-                {"token": account_data[i], "proxy": proxy_data[i] if i < len(proxy_data) else None}
-                for i in range(len(account_data))
-            ]
-
+            ping_response = requests.post(ping_url, headers=ping_headers, json=ping_payload)
+            if ping_response.status_code == 201:
+                try:
+                    print(f"{Fore.GREEN + Style.BRIGHT}[{request_count}] Ping Success: {ping_response.json()}{Style.RESET_ALL}")
+                except ValueError:
+                    print(f"{Fore.GREEN + Style.BRIGHT}[{request_count}] Ping Success (Non-JSON Response): {ping_response.text}{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED + Style.BRIGHT}[{request_count}] Ping Failed: {ping_response.status_code}, Response: {ping_response.text}{Style.RESET_ALL}")
         except Exception as e:
-            print(f"Error reading accounts: {e}")
-            exit(1)
+            print(f"{Fore.RED + Style.BRIGHT}[{request_count}] Ping Error: {str(e)}{Style.RESET_ALL}")
 
-    def process_single_account(self, account):
-        pinger = NodeGoPinger(account["token"], account["proxy"])
-        
-        user_info = pinger.get_user_info()
-        if not user_info:
-            print("Failed to retrieve user info")
-            return
+        # Send GET request to client IP endpoint
+        try:
+            client_ip_response = requests.get(client_ip_url, headers=headers)
+            if client_ip_response.status_code == 200:
+                try:
+                    print(f"{Fore.GREEN + Style.BRIGHT}[{request_count}] Client IP Success: {client_ip_response.json()}{Style.RESET_ALL}")
+                except ValueError:
+                    print(f"{Fore.GREEN + Style.BRIGHT}[{request_count}] Client IP Success (Non-JSON Response): {client_ip_response.text}{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.RED + Style.BRIGHT}[{request_count}] Client IP Failed: {client_ip_response.status_code}, Response: {client_ip_response.text}{Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{Fore.RED + Style.BRIGHT}[{request_count}] Client IP Error: {str(e)}{Style.RESET_ALL}")
 
-        ping_response = pinger.ping()
-        if ping_response:
-            print("=" * 50)
-            print(f"🌲 [FORESTARMY] Username: {user_info['username']}")
-            print(f"📧 Email: {user_info['email']}")
-            for index, node in enumerate(user_info["nodes"], start=1):
-                print(f"\n🌳 Node {index}:")
-                print(f"  🔹 ID: {node['id']}")
-                print(f"  🔸 Total Points: {node['totalPoint']}")
-                print(f"  🔹 Today's Points: {node['todayPoint']}")
-                print(f"  🔸 Status: {'✅ Active' if node['isActive'] else '❌ Inactive'}")
-            print(f"\n🏆 Total Points: {user_info['totalPoint']}")
-            print(f"📡 Status Code: {ping_response['statusCode']}")
-            print(f"💬 Ping Message: {ping_response['message']}")
-            print(f"🆔 Metadata ID: {ping_response['metadataId']}")
-            print("=" * 50)
-
-    def run_pinger(self):
-        print("\n🌲 [FORESTARMY] Proudly made by itsmesatyavir 🌲")
-        print("🚀 No selling, No spam 🚀")
-
-        while self.is_running:
-            print(f"\n⏰ Ping Reset at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-
-            for account in self.accounts:
-                if not self.is_running:
-                    break
-                self.process_single_account(account)
-
-            if self.is_running:
-                time.sleep(15)
-
-
-# Run the multi-account pinger
-if __name__ == "__main__":
-    pinger = MultiAccountPinger()
-    pinger.run_pinger()
+        time.sleep(5)  # Delay to prevent excessive load
+except KeyboardInterrupt:
+    print("\nScript stopped by user.")
+    
